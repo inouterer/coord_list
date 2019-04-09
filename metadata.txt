@@ -16,8 +16,8 @@ email=lebedev77@gmail.com
 
 about=CoordList creates a points on the vertices of the selected object and forms a list of coordinates
 
-tracker=http://bugs
-repository=http://repo
+tracker=https://github.com/inouterer/coord_list/issues
+repository=https://github.com/inouterer/coord_list/
 # End of mandatory metadata
 
 # Recommended items:
@@ -32,7 +32,7 @@ homepage=http://homepage
 category=Plugins
 icon=icon.png
 # experimental flag
-experimental=True
+experimental=False
 
 # deprecated flag (applies to the whole plugin, not just a single version)
 deprecated=False
