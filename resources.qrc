@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/plugins/coord_list" >
+        <file>icon.png</file>
+    </qresource>
+</RCC>
