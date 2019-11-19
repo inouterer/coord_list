@@ -241,37 +241,54 @@ class CoordList:
             geom = feat[0].geometry()
 
             #Find out type o geometry
+            sngl=0
             geomSingleType = QgsWkbTypes.isSingleType(geom.wkbType())
             if geom.type() == QgsWkbTypes.PointGeometry:
                 # the geometry type can be of single or multi type
                 if geomSingleType:
                     coords = geom.asPoint()
+                    sngl=1
+                    print ("Point")
                 else:
                     coords = geom.asMultiPoint()
+                    print ("MultiPoint")
             elif geom.type() == QgsWkbTypes.LineGeometry:
                 if geomSingleType:
-                    xcoords = geom.asPolyline()
+                    coords = geom.asPolyline()
+                    sngl=1
+                    print ("Polyline")
                 else:
                     coords = geom.asMultiPolyline()
+                    print ("MultiPolyline")
             elif geom.type() == QgsWkbTypes.PolygonGeometry:
                 if geomSingleType:
                     coords = geom.asPolygon()
+                    sngl=0
+                    print ("Polygon")
                 else:
                     coords = geom.asMultiPolygon()
+                    print ("MultiPolygon")
             else:
-                print("Unknown or invalid geometry")
-
+                QMessageBox.warning(None, "Warning!", "Unknown or invalid geometry")
+            #print (sngl)
             #Make a list of points
             pnts = []
             pid=0
-            for z in coords:
-                for x, y in z:
+            if sngl==0:
+                for z in coords:
+                    for x, y in z:
+                        pid+=1
+                        pnts.append(QgsPointXY(x,y))
+            else:
+                #print (coords)
+                for x, y in coords:
                     pid+=1
                     pnts.append(QgsPointXY(x,y))
             numpnt = pid #Num points
             #Process
             crs = layer.crs()
             pid=0
+
             for x, y in pnts:
                 pid+=1
                 point1 = QgsPointXY(x,y)

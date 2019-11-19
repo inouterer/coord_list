@@ -10,7 +10,7 @@
 name=Coord List
 qgisMinimumVersion=3.0
 description=CoordList
-version=0.1
+version=0.2
 author=Ian Lebedev
 email=lebedev77@gmail.com
 
