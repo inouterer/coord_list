@@ -70,7 +70,6 @@ class CoordList:
         self.actions = []
         self.menu = self.tr(u'&Coord List')
 
-
         # Check if plugin was started the first time in current QGIS session
         # Must be set in initGui() to survive plugin reloads
         self.first_start = None
@@ -206,24 +205,28 @@ class CoordList:
             # Do something useful here - delete the line containing pass and
             # substitute with your code.
             #from qgis.core import *
-            from qgis.PyQt.QtCore import QVariant
+
 
             # Define sourse layer features
             layer = self.iface.activeLayer()
-            crs = layer.crs()
-            destCrs = self.dlg.mQgsProjectionSelectionWidget.crs()
-
-            #Transform
-            transformContext = QgsProject.instance().transformContext()
-            xform = QgsCoordinateTransform(crs, destCrs, transformContext)
-            # forward transformation: src -> dest
-
-
-            #QMessageBox.warning(None, "Warning!", str(destCrs))
-
+            dest_crs = self.dlg.mQgsProjectionSelectionWidget.crs()
+            QMessageBox.warning(None, "Warning!", str(dest_crs))
+            if layer is None:
+                QMessageBox.warning(None, "Warning!", "No selected layer")
+                return None
+            if (layer.type() != 0):
+                QMessageBox.warning(None, "Warning!", "Layer selected is not vector")
+                return None
+            if layer.selectedFeatureCount() == 0:
+                QMessageBox.warning(None, "Warning!", "No feature selected")
+                return None
+            if layer.selectedFeatureCount() > 1:
+                QMessageBox.warning(None, "Warning!", "More than one feature is selected")
+                return None
+            crs = layer.crs().toWkt()
             #Create layer with destination CRS
-            vl = QgsVectorLayer('Point?crs='+ destCrs.toWkt(), 'LC', 'memory')
-
+            vl = QgsVectorLayer('Point?crs='+ crs, 'LC', 'memory')
+            from qgis.PyQt.QtCore import QVariant
             pr = vl.dataProvider()
             pr.addAttributes([QgsField("pid", QVariant.Int),
                               QgsField("x",  QVariant.Double),
@@ -236,53 +239,55 @@ class CoordList:
             feat = layer.selectedFeatures()
             geom = feat[0].geometry()
 
-            # Find out type o geometry
-            sngl = 0
+            #Find out type o geometry
+            sngl=0
             geomSingleType = QgsWkbTypes.isSingleType(geom.wkbType())
             if geom.type() == QgsWkbTypes.PointGeometry:
                 # the geometry type can be of single or multi type
                 if geomSingleType:
                     coords = geom.asPoint()
-                    sngl = 1
-                    print("Point")
+                    sngl=1
+                    print ("Point")
                 else:
                     coords = geom.asMultiPoint()
-                    print("MultiPoint")
+                    print ("MultiPoint")
             elif geom.type() == QgsWkbTypes.LineGeometry:
                 if geomSingleType:
                     coords = geom.asPolyline()
-                    sngl = 1
-                    print("Polyline")
+                    sngl=1
+                    print ("Polyline")
                 else:
                     coords = geom.asMultiPolyline()
-                    print("MultiPolyline")
+                    print ("MultiPolyline")
             elif geom.type() == QgsWkbTypes.PolygonGeometry:
                 if geomSingleType:
                     coords = geom.asPolygon()
-                    sngl = 0
-                    print("Polygon")
+                    sngl=0
+                    print ("Polygon")
                 else:
                     coords = geom.asMultiPolygon()
-                    print("MultiPolygon")
+                    print ("MultiPolygon")
             else:
                 QMessageBox.warning(None, "Warning!", "Unknown or invalid geometry")
-
-            # Make a list of points
+            #print (sngl)
+            #Make a list of points
             pnts = []
-            pid = 0
-            if sngl == 0:
+            pid=0
+            if sngl==0:
                 for z in coords:
                     for x, y in z:
-                        pid += 1
-                        pnts.append(xform.transform(QgsPointXY(x, y)))
+                        pid+=1
+                        pnts.append(QgsPointXY(x,y))
             else:
-                # print (coords)
+                #print (coords)
                 for x, y in coords:
-                    pid += 1
-                    pnts.append(xform.transform(QgsPointXY(x, y)))
-            numpnt = pid  # Num points
-
+                    pid+=1
+                    pnts.append(QgsPointXY(x,y))
+            numpnt = pid #Num points
+            #Process
+            crs = layer.crs()
             pid=0
+
             for x, y in pnts:
                 pid+=1
                 point1 = QgsPointXY(x,y)
@@ -299,12 +304,11 @@ class CoordList:
                     len = QgsPointXY.distance(point1, point2)
                 #distance.setEllipsoidalMode(True)
                 angl = QgsPointXY.azimuth(point1, point2)
-                # Insert in layer
+                #Insert in layer
                 f = QgsFeature()
-                f.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(x, y)))
+                f.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(x,y)))
                 f.setAttributes([pid, x, y, len, angl])
                 pr.addFeature(f)
-
 
             #Commit new layer and add to map
             vl.updateExtents()
