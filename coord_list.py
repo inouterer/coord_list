@@ -29,7 +29,8 @@ from .resources import *
 # Import the code for the dialog
 from .coord_list_dialog import CoordListDialog
 import os.path
-#My
+import math
+# My
 from PyQt5.QtWidgets import QAction, QMessageBox
 from PyQt5.QtCore import QVariant
 from qgis.core import *
@@ -70,7 +71,6 @@ class CoordList:
         self.actions = []
         self.menu = self.tr(u'&Coord List')
 
-
         # Check if plugin was started the first time in current QGIS session
         # Must be set in initGui() to survive plugin reloads
         self.first_start = None
@@ -90,18 +90,17 @@ class CoordList:
         # noinspection PyTypeChecker,PyArgumentList,PyCallByClass
         return QCoreApplication.translate('CoordList', message)
 
-
     def add_action(
-        self,
-        icon_path,
-        text,
-        callback,
-        enabled_flag=True,
-        add_to_menu=True,
-        add_to_toolbar=True,
-        status_tip=None,
-        whats_this=None,
-        parent=None):
+            self,
+            icon_path,
+            text,
+            callback,
+            enabled_flag=True,
+            add_to_menu=True,
+            add_to_toolbar=True,
+            status_tip=None,
+            whats_this=None,
+            parent=None):
         """Add a toolbar icon to the toolbar.
 
         :param icon_path: Path to the icon for this action. Can be a resource
@@ -178,7 +177,6 @@ class CoordList:
         # will be set False in run()
         self.first_start = True
 
-
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
         for action in self.actions:
@@ -186,7 +184,6 @@ class CoordList:
                 self.tr(u'&Coord List'),
                 action)
             self.iface.removeToolBarIcon(action)
-
 
     def run(self):
         """Run method that performs all the real work"""
@@ -197,6 +194,24 @@ class CoordList:
             self.first_start = False
             self.dlg = CoordListDialog()
 
+        # Set CRS widget value.
+        self.dlg.mQgsProjectionSelectionWidget.setCrs(self.iface.activeLayer().crs())
+
+        # Define sourse layer features - control
+        layer = self.iface.activeLayer()
+        if layer is None:
+            QMessageBox.warning(None, "Warning!", "No selected layer! Select one feature on active layer.")
+            return None
+        if (layer.type() != 0):
+            QMessageBox.warning(None, "Warning!", "Layer selected is not vector!")
+            return None
+        if layer.selectedFeatureCount() == 0:
+            QMessageBox.warning(None, "Warning!", "No feature selected! Select one feature on active layer.")
+            return None
+        if layer.selectedFeatureCount() > 1:
+            QMessageBox.warning(None, "Warning!", "More than one feature is selected!")
+            return None
+
         # show the dialog
         self.dlg.show()
         # Run the dialog event loop
@@ -205,45 +220,44 @@ class CoordList:
         if result:
             # Do something useful here - delete the line containing pass and
             # substitute with your code.
-            #from qgis.core import *
+            # from qgis.core import *
             from qgis.PyQt.QtCore import QVariant
 
-            # Define sourse layer features
+            # Define sourse layer features - control
             layer = self.iface.activeLayer()
             crs = layer.crs()
             destCrs = self.dlg.mQgsProjectionSelectionWidget.crs()
 
-            #Transform
+            # QMessageBox.warning(None, "Warning!", destCrs.ellipsoidAcronym())
+
+            # Transform
             transformContext = QgsProject.instance().transformContext()
             xform = QgsCoordinateTransform(crs, destCrs, transformContext)
-            # forward transformation: src -> dest
 
-
-            #QMessageBox.warning(None, "Warning!", str(destCrs))
-
-            #Create layer with destination CRS
-            vl = QgsVectorLayer('Point?crs='+ destCrs.toWkt(), 'LC', 'memory')
-
+            # Create layer with destination CRS
+            vl = QgsVectorLayer('Point?crs=' + destCrs.toWkt(), 'Coord_' + destCrs.description(), 'memory')
             pr = vl.dataProvider()
             pr.addAttributes([QgsField("pid", QVariant.Int),
-                              QgsField("x",  QVariant.Double),
+                              QgsField("x", QVariant.Double),
                               QgsField("y", QVariant.Double),
                               QgsField("len", QVariant.Double),
                               QgsField("azmt", QVariant.Double)])
             vl.updateFields()
 
-            #Define selected obj
+            # Define selected obj
             feat = layer.selectedFeatures()
             geom = feat[0].geometry()
+            QgsMessageLog.logMessage(str(geom))
 
             # Find out type o geometry
-            sngl = 0
+            # the geometry type can be of single or multi type
+            # We work with Polyline, Polygon,
+
             geomSingleType = QgsWkbTypes.isSingleType(geom.wkbType())
             if geom.type() == QgsWkbTypes.PointGeometry:
-                # the geometry type can be of single or multi type
                 if geomSingleType:
                     coords = geom.asPoint()
-                    sngl = 1
+                    sngl_geom = 1
                     print("Point")
                 else:
                     coords = geom.asMultiPoint()
@@ -251,7 +265,7 @@ class CoordList:
             elif geom.type() == QgsWkbTypes.LineGeometry:
                 if geomSingleType:
                     coords = geom.asPolyline()
-                    sngl = 1
+                    sngl_geom = 1
                     print("Polyline")
                 else:
                     coords = geom.asMultiPolyline()
@@ -259,18 +273,20 @@ class CoordList:
             elif geom.type() == QgsWkbTypes.PolygonGeometry:
                 if geomSingleType:
                     coords = geom.asPolygon()
-                    sngl = 0
+                    sngl_geom = 0
                     print("Polygon")
                 else:
                     coords = geom.asMultiPolygon()
                     print("MultiPolygon")
             else:
                 QMessageBox.warning(None, "Warning!", "Unknown or invalid geometry")
+                return None
+            # We work only pline or polygon
 
             # Make a list of points
             pnts = []
             pid = 0
-            if sngl == 0:
+            if sngl_geom == 0:
                 for z in coords:
                     for x, y in z:
                         pid += 1
@@ -280,37 +296,41 @@ class CoordList:
                 for x, y in coords:
                     pid += 1
                     pnts.append(xform.transform(QgsPointXY(x, y)))
-            numpnt = pid  # Num points
 
-            pid=0
+            numpnt = pid  # Num points
+            pid = 0
+            # Not properly working QMessageBox.warning(None, "Warning!", str(destCrs.isGeographic()))
             for x, y in pnts:
-                pid+=1
-                point1 = QgsPointXY(x,y)
-                if pid==numpnt:
+                pid += 1
+                point1 = QgsPointXY(x, y)
+                if pid == numpnt:
                     point2 = pnts[0]
                 else:
                     point2 = pnts[pid]
-                #Create a measure object
+                # Create a measure object
                 distance = QgsDistanceArea()
-                if crs.postgisSrid()==4326:
-                    distance.setEllipsoid('WGS84')
+                # distance.setSourceCrs(destCrs)
+                if destCrs.toProj().find('+proj=longlat') >= 0:  # destCrs.isGeographic():
+                    distance.setEllipsoid(destCrs.ellipsoidAcronym())
                     len = distance.measureLine(point1, point2)
+                    azim = distance.bearing(point1, point2) * 180 / math.pi
+                    # QMessageBox.warning(None, "Warning!", destCrs.isGeographic())
                 else:
-                    len = QgsPointXY.distance(point1, point2)
-                #distance.setEllipsoidalMode(True)
-                angl = QgsPointXY.azimuth(point1, point2)
+                    # distance.setEllipsoidalMode(True)
+                    len = distance.measureLine(point1, point2)
+                    azim = distance.bearing(point1, point2) * 180 / math.pi
+
                 # Insert in layer
                 f = QgsFeature()
                 f.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(x, y)))
-                f.setAttributes([pid, x, y, len, angl])
+                f.setAttributes([pid, x, y, len, azim])
                 pr.addFeature(f)
 
-
-            #Commit new layer and add to map
+            # Commit new layer and add to map
             vl.updateExtents()
             QgsProject.instance().addMapLayer(vl)
 
-            #Labeling
+            # Labeling
             settings = QgsPalLayerSettings()
             settings.fieldName = 'pid'
             labeling = QgsVectorLayerSimpleLabeling(settings)
@@ -318,7 +338,7 @@ class CoordList:
             lv.setLabeling(labeling)
             lv.setLabelsEnabled(True)
             lv.triggerRepaint()
-            #Show attribute Table
+            # Show attribute Table
             if self.dlg.checkBox.isChecked():
                 iface.showAttributeTable(iface.activeLayer())
             else:
