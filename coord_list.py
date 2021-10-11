@@ -223,14 +223,10 @@ class CoordList:
             # from qgis.core import *
             from qgis.PyQt.QtCore import QVariant
 
-            print ('START_________________________________')
-
             # Define sourse layer features - control
             layer = self.iface.activeLayer()
             crs = layer.crs()
             destCrs = self.dlg.mQgsProjectionSelectionWidget.crs()
-
-            # QMessageBox.warning(None, "Warning!", destCrs.ellipsoidAcronym())
 
             # Transform
             transformContext = QgsProject.instance().transformContext()
@@ -254,101 +250,82 @@ class CoordList:
             # Find out type o geometry
             # the geometry type can be of single or multi type
             # We work with Polyline, Polygon,
-
             geomSingleType = QgsWkbTypes.isSingleType(geom.wkbType())
-
             if geom.type() == QgsWkbTypes.LineGeometry:
                 if geomSingleType:
                     coords = geom.asPolyline()
                     geomType = 'sLine'
-                    print("Polyline")
+                    # print("Polyline")
                 else:
                     coords = geom.asMultiPolyline()
                     geomType = 'mLine'
-                    print("MultiPolyline")
+                    # print("MultiPolyline")
             elif geom.type() == QgsWkbTypes.PolygonGeometry:
                 if geomSingleType:
                     coords = geom.asPolygon()
                     geomType = 'sPoly'
-                    print("Polygon")
+                    # print("Polygon")
                 else:
                     coords = geom.asMultiPolygon()
                     geomType = 'mPoly'
-                    print("MultiPolygon")
+                    # print("MultiPolygon")
             else:
                 QMessageBox.warning(None, "Warning!", "Unknown or invalid geometry")
                 return None
 
             # We work only pline or polygon or multy
-            # Make a list of points
-            print (geom)
-            print(coords)
-            print(geomSingleType)
-            pointId=0
+            # Make a point list
+            pointId = 0
             pointList = []
             if geomType == 'sLine':
                 nodes = len(coords)
                 for n, pnt in enumerate(coords):
-                    if n==nodes:
+                    if n == nodes:
                         break
                     pointId += 1
-                    print(nodes, n, pointId, pnt)
                     pointList.append([nodes, n, pointId, pnt])
-                print ('cicle')
             if geomType == 'sPoly':
                 for part in coords:
-                    nodes = len(part)-1
-                    print('nodes'+ str(nodes))
-                    for n, pnt in enumerate(part):
-                        if n==nodes:
-                            break
-                        pointId += 1
-                        print(nodes, n, pointId, pnt)
-                        pointList.append([nodes, n, pointId, pnt])
-                print ('cicle')
-            if geomType == 'mLine':
-                for part in coords:
-                    nodes = len(part)
-                    print('nodes' + str(nodes))
+                    nodes = len(part) - 1
                     for n, pnt in enumerate(part):
                         if n == nodes:
                             break
                         pointId += 1
-                        print(nodes, n, pointId, pnt)
                         pointList.append([nodes, n, pointId, pnt])
-                print('cicle')
+            if geomType == 'mLine':
+                for part in coords:
+                    nodes = len(part)
+                    for n, pnt in enumerate(part):
+                        if n == nodes:
+                            break
+                        pointId += 1
+                        pointList.append([nodes, n, pointId, pnt])
             if geomType == 'mPoly':
                 for mult in coords:
                     for part in mult:
-                        nodes = len(part)-1
-                        print('nodes'+ str(nodes))
+                        nodes = len(part) - 1
                         for n, pnt in enumerate(part):
-                            if n==nodes:
+                            if n == nodes:
                                 break
                             pointId += 1
-                            print(nodes, n, pointId, pnt)
                             pointList.append([nodes, n, pointId, pnt])
-                    print ('cicle')
+            # Create layer with geodata
             for nodes, n, pntId, point in pointList:
-                print (nodes, n, pntId, point)
                 thisPoint = xform.transform(QgsPointXY(point.x(), point.y()))
                 if n == 0:
                     firstPoint = thisPoint
-                if n == nodes-1:
+                if n == nodes - 1:
                     nextPoint = firstPoint
-                    print(distance.measureLine(thisPoint, nextPoint))
                 else:
                     nextItem = pointList[pntId]
                     nextPoint = xform.transform(nextItem[3].x(), nextItem[3].y())
-                    # Create a measure object
-                    distance = QgsDistanceArea()
-                    # distance.setSourceCrs(destCrs)
-                    print (distance.measureLine(thisPoint, nextPoint))
-                if destCrs.toProj().find('+proj=longlat') >= 0:  # destCrs.isGeographic():
+                # Create a measure object
+                distance = QgsDistanceArea()
+                # If long/lat set ellipsoid
+                if destCrs.toProj().find('+proj=longlat') >= 0:
                     distance.setEllipsoid(destCrs.ellipsoidAcronym())
                     lenght = distance.measureLine(thisPoint, nextPoint)
                     azim = distance.bearing(thisPoint, nextPoint) * 180 / math.pi
-                    # QMessageBox.warning(None, "Warning!", destCrs.isGeographic())
                 else:
                     # distance.setEllipsoidalMode(True)
                     lenght = distance.measureLine(thisPoint, nextPoint)
@@ -358,8 +335,6 @@ class CoordList:
                 f.setGeometry(QgsGeometry.fromPointXY(point))
                 f.setAttributes([pntId, point.x(), point.y(), lenght, azim])
                 pr.addFeature(f)
-
-            # return None
 
             # Commit new layer and add to map
             vl.updateExtents()
