@@ -223,6 +223,8 @@ class CoordList:
             # from qgis.core import *
             from qgis.PyQt.QtCore import QVariant
 
+            print ('START_________________________________')
+
             # Define sourse layer features - control
             layer = self.iface.activeLayer()
             crs = layer.crs()
@@ -254,77 +256,79 @@ class CoordList:
             # We work with Polyline, Polygon,
 
             geomSingleType = QgsWkbTypes.isSingleType(geom.wkbType())
-            if geom.type() == QgsWkbTypes.PointGeometry:
-                if geomSingleType:
-                    coords = geom.asPoint()
-                    sngl_geom = 1
-                    print("Point")
-                else:
-                    coords = geom.asMultiPoint()
-                    print("MultiPoint")
-            elif geom.type() == QgsWkbTypes.LineGeometry:
+
+            if geom.type() == QgsWkbTypes.LineGeometry:
                 if geomSingleType:
                     coords = geom.asPolyline()
                     sngl_geom = 1
                     print("Polyline")
                 else:
                     coords = geom.asMultiPolyline()
+                    sngl_geom = 0
                     print("MultiPolyline")
             elif geom.type() == QgsWkbTypes.PolygonGeometry:
                 if geomSingleType:
                     coords = geom.asPolygon()
-                    sngl_geom = 0
+                    sngl_geom = 1
                     print("Polygon")
                 else:
                     coords = geom.asMultiPolygon()
+                    sngl_geom = 0
                     print("MultiPolygon")
             else:
                 QMessageBox.warning(None, "Warning!", "Unknown or invalid geometry")
                 return None
+
             # We work only pline or polygon
-
             # Make a list of points
-            pnts = []
-            pid = 0
-            if sngl_geom == 0:
-                for z in coords:
-                    for x, y in z:
-                        pid += 1
-                        pnts.append(xform.transform(QgsPointXY(x, y)))
-            else:
-                # print (coords)
-                for x, y in coords:
-                    pid += 1
-                    pnts.append(xform.transform(QgsPointXY(x, y)))
+            print (geom)
+            print(coords)
+            print('sinle geom '+str(sngl_geom))
+            print('!!!!!!!!!!!!!!!')
+            pointId=0
+            pointList = []
+            if sngl_geom:
+                for part in coords:
+                    nodes = len(part)-1
+                    print('nodes'+ str(nodes))
+                    for n, pnt in enumerate(part):
+                        if n==nodes:
+                            break
+                        pointId += 1
+                        print(nodes, n, pointId, pnt)
+                        pointList.append([nodes, n, pointId, pnt])
+                print ('cicle')
+                for nodes, n, pntId, point in pointList:
+                    print (nodes, n, pntId, point)
+                    thisPoint = xform.transform(QgsPointXY(point.x(), point.y()))
+                    if n == 0:
+                        firstPoint = thisPoint
+                    if n == nodes-1:
+                        nextPoint = firstPoint
+                        print(distance.measureLine(thisPoint, nextPoint))
+                    else:
+                        nextItem = pointList[pntId]
+                        nextPoint = xform.transform(nextItem[3].x(), nextItem[3].y())
+                        # Create a measure object
+                        distance = QgsDistanceArea()
+                        # distance.setSourceCrs(destCrs)
+                        print (distance.measureLine(thisPoint, nextPoint))
+                    if destCrs.toProj().find('+proj=longlat') >= 0:  # destCrs.isGeographic():
+                        distance.setEllipsoid(destCrs.ellipsoidAcronym())
+                        lenght = distance.measureLine(thisPoint, nextPoint)
+                        azim = distance.bearing(thisPoint, nextPoint) * 180 / math.pi
+                        # QMessageBox.warning(None, "Warning!", destCrs.isGeographic())
+                    else:
+                        # distance.setEllipsoidalMode(True)
+                        lenght = distance.measureLine(thisPoint, nextPoint)
+                        azim = distance.bearing(thisPoint, nextPoint) * 180 / math.pi
+                    # Insert in layer
+                    f = QgsFeature()
+                    f.setGeometry(QgsGeometry.fromPointXY(point))
+                    f.setAttributes([pntId, point.x(), point.y(), lenght, azim])
+                    pr.addFeature(f)
 
-            numpnt = pid  # Num points
-            pid = 0
-            # Not properly working QMessageBox.warning(None, "Warning!", str(destCrs.isGeographic()))
-            for x, y in pnts:
-                pid += 1
-                point1 = QgsPointXY(x, y)
-                if pid == numpnt:
-                    point2 = pnts[0]
-                else:
-                    point2 = pnts[pid]
-                # Create a measure object
-                distance = QgsDistanceArea()
-                # distance.setSourceCrs(destCrs)
-                if destCrs.toProj().find('+proj=longlat') >= 0:  # destCrs.isGeographic():
-                    distance.setEllipsoid(destCrs.ellipsoidAcronym())
-                    len = distance.measureLine(point1, point2)
-                    azim = distance.bearing(point1, point2) * 180 / math.pi
-                    # QMessageBox.warning(None, "Warning!", destCrs.isGeographic())
-                else:
-                    # distance.setEllipsoidalMode(True)
-                    len = distance.measureLine(point1, point2)
-                    azim = distance.bearing(point1, point2) * 180 / math.pi
-
-                # Insert in layer
-                f = QgsFeature()
-                f.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(x, y)))
-                f.setAttributes([pid, x, y, len, azim])
-                pr.addFeature(f)
+            # return None
 
             # Commit new layer and add to map
             vl.updateExtents()
