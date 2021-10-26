@@ -312,6 +312,7 @@ class CoordList:
             # Create layer with geodata
             for nodes, n, pntId, point in pointList:
                 thisPoint = xform.transform(QgsPointXY(point.x(), point.y()))
+                x = thisPoint
                 if n == 0:
                     firstPoint = thisPoint
                 if n == nodes - 1:
@@ -330,10 +331,11 @@ class CoordList:
                     # distance.setEllipsoidalMode(True)
                     lenght = distance.measureLine(thisPoint, nextPoint)
                     azim = distance.bearing(thisPoint, nextPoint) * 180 / math.pi
+                #QMessageBox.warning(None, "Warning!", str(thisPoint))
                 # Insert in layer
                 f = QgsFeature()
-                f.setGeometry(QgsGeometry.fromPointXY(point))
-                f.setAttributes([pntId, point.x(), point.y(), lenght, azim])
+                f.setGeometry(QgsGeometry.fromPointXY(thisPoint))
+                f.setAttributes([pntId, thisPoint.x(), thisPoint.y(), lenght, azim])
                 pr.addFeature(f)
 
             # Commit new layer and add to map
